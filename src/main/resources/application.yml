@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: s3-import
+
+management:
+  server:
+    port: 8090
+
+#app:
+#  s3:
+#    endpoint:
+#    path-style:
+#    bucket-name:
+#  csv:
+#    file-path:
+#  time:
+#    update-cron:
+#    wait-unit-time-millis:
+#    min-update-interval-millis:
+#    node-keep-alive-millis:
+#  node:
+#    generations:
