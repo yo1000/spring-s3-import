@@ -4,6 +4,7 @@ import com.yo1000.s3import.config.TimeProperties;
 import com.yo1000.s3import.domain.Node;
 import com.yo1000.s3import.domain.NodeRepository;
 import com.yo1000.s3import.domain.vo.NodeIdHolder;
+import com.yo1000.s3import.domain.vo.WaitTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.StreamSupport;
 
 @Transactional
@@ -30,39 +32,30 @@ public class NodeApplicationService {
         this.nodeIdHolder = nodeIdHolder;
     }
 
-    public boolean checkInit(long execTime) {
-        if (nodeRepository.findById(nodeIdHolder.value()).isEmpty()) {
-            if (nodeRepository.findById(Node.INIT_CHECK.id()).isPresent()) {
-                sleep(execTime, timeProps.getWaitUnitTimeMillis());
-            } else {
-                try {
-                    nodeRepository.save(Node.INIT_CHECK);
-                } catch (DuplicateKeyException e) {
-                    logger.warn(e.getMessage());
-                    sleep(execTime, timeProps.getWaitUnitTimeMillis());
-                }
-            }
+    public boolean exists() {
+        return nodeRepository.findById(nodeIdHolder.value()).isPresent();
+    }
 
-            return true;
+    public Optional<WaitTime> register(long execTime) {
+        Optional<WaitTime> waitTime = Optional.empty();
+
+        if (nodeRepository.findById(Node.INIT_CHECK.id()).isPresent()) {
+            waitTime = Optional.of(new WaitTime(timeProps.getWaitUnitTimeMillis()));
         } else {
-            return false;
+            try {
+                nodeRepository.save(Node.INIT_CHECK);
+            } catch (DuplicateKeyException e) {
+                logger.warn(e.getMessage());
+                waitTime = Optional.of(new WaitTime(timeProps.getWaitUnitTimeMillis()));
+            }
         }
-    }
 
-    public void await(long execTime) {
-        nodeRepository.findById(nodeIdHolder.value())
-                .filter(node -> node.rank() >= 0)
-                .ifPresent(node -> {
-                    long sleepMillis = node.rank() * timeProps.getWaitUnitTimeMillis();
-                    sleep(execTime, sleepMillis);
-                });
-    }
-
-    public void register(long execTime) {
         nodeRepository.save(new Node(nodeIdHolder.value(), -1, execTime));
+
+        return waitTime;
     }
 
-    public void updateRank(long execTime) {
+    public Optional<WaitTime> rank(long execTime) {
         Iterable<Node> allNodes = nodeRepository.findAll();
         List<Node> sortedNodes = StreamSupport.stream(allNodes.spliterator(), false)
                 .filter(n -> !Objects.equals(n.id(), Node.INIT_CHECK.id()))
@@ -77,19 +70,14 @@ public class NodeApplicationService {
 
             nodeRepository.save(saveNode);
         }
+
+        return nodeRepository.findById(nodeIdHolder.value())
+                .filter(node -> node.rank() >= 0)
+                .map(node -> new WaitTime(node.rank() * timeProps.getWaitUnitTimeMillis()));
     }
 
     public void cleanup(long execTime) {
         long expiredTime = execTime - timeProps.getNodeKeepAliveMillis();
         nodeRepository.deleteByLastModifiedEpochMillisBefore(expiredTime);
-    }
-
-    private void sleep(long execTime, long sleepMillis) {
-        try {
-            logger.info("Node={} Time={} | Sleep {}-millis.", nodeIdHolder.value(), execTime, sleepMillis);
-            Thread.sleep(sleepMillis);
-        } catch (InterruptedException e) {
-            logger.warn(e.getMessage());
-        }
     }
 }

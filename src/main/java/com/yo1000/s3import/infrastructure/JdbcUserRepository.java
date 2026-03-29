@@ -222,37 +222,45 @@ public class JdbcUserRepository implements UserRepository {
                     .addValue("creationEpochMillis", user.creationEpochMillis()));
 
             if (batchParams.size() >= batchSize) {
-                namedJdbcOperations.batchUpdate("""
-                            INSERT INTO "user" (
-                                id,
-                                username,
-                                email,
-                                given_name,
-                                family_name,
-                                gender,
-                                birth_date,
-                                address,
-                                creation_epoch_millis
-                            ) VALUES (
-                                :id,
-                                :username,
-                                :email,
-                                :givenName,
-                                :familyName,
-                                :gender,
-                                :birthDate,
-                                :address,
-                                :creationEpochMillis
-                            )
-                        """,
-                        batchParams.toArray(MapSqlParameterSource[]::new));
-
+                batchUpdate(batchParams);
                 batchParams.clear();
             }
         }
 
+        if (!batchParams.isEmpty()) {
+            batchUpdate(batchParams);
+        }
+
         // To prioritise performance, the method returns the argument as is.
         return entities;
+    }
+
+    private void batchUpdate(List<SqlParameterSource> params) {
+        namedJdbcOperations.batchUpdate(
+                """
+                    INSERT INTO "user" (
+                        id,
+                        username,
+                        email,
+                        given_name,
+                        family_name,
+                        gender,
+                        birth_date,
+                        address,
+                        creation_epoch_millis
+                    ) VALUES (
+                        :id,
+                        :username,
+                        :email,
+                        :givenName,
+                        :familyName,
+                        :gender,
+                        :birthDate,
+                        :address,
+                        :creationEpochMillis
+                    )
+                """,
+                params.toArray(MapSqlParameterSource[]::new));
     }
 
     @Override

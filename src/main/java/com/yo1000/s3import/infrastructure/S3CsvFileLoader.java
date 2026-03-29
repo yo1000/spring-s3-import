@@ -13,11 +13,9 @@ import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.Stack;
 import java.util.zip.GZIPInputStream;
 
 @Repository
@@ -55,16 +53,25 @@ public class S3CsvFileLoader<R> implements CsvFileLoader<UserCsv, R> {
                 .with(csvSchema)
                 .readValues(bufferedReader);
 
-        return new RowHandlingIterator<>(iter, handler);
+        return new RowHandlingIterator<>(handler, iter, s3Stream, gzipStream, inputStreamReader, bufferedReader);
     }
 
     static class RowHandlingIterator<T, R> implements CloseableIterator<R> {
-        private final MappingIterator<T> sourceIterator;
         private final RowHandler<T, R> rowHandler;
+        private final MappingIterator<T> sourceIterator;
+        private final Stack<Closeable> closeableStack;
 
-        public RowHandlingIterator(MappingIterator<T> sourceIterator, RowHandler<T, R> rowHandler) {
-            this.sourceIterator = sourceIterator;
+        public RowHandlingIterator(
+                RowHandler<T, R> rowHandler,
+                MappingIterator<T> sourceIterator,
+                Closeable... closeables) {
             this.rowHandler = rowHandler;
+            this.sourceIterator = sourceIterator;
+            this.closeableStack = new Stack<>();
+
+            for (Closeable closeable : closeables) {
+                closeableStack.push(closeable);
+            }
         }
 
         @Override
@@ -89,6 +96,9 @@ public class S3CsvFileLoader<R> implements CsvFileLoader<UserCsv, R> {
         public void close() {
             try {
                 sourceIterator.close();
+                while (!closeableStack.isEmpty()) {
+                    closeableStack.pop().close();
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

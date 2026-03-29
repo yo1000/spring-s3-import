@@ -4,8 +4,6 @@ import com.yo1000.s3import.application.UserApplicationService;
 import com.yo1000.s3import.domain.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PagedModel;
-import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.web.bind.annotation.*;
 
 @RestController

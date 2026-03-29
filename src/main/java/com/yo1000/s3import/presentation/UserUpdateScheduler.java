@@ -43,11 +43,12 @@ public class UserUpdateScheduler {
         long execTime = clock.millis();
 
         logger.info("Node={} Time={} | Starting table updates.", nodeIdHolder.value(), execTime);
-        if (nodeApplicationService.checkInit(execTime)) {
-            nodeApplicationService.register(execTime);
+        if (!nodeApplicationService.exists()) {
+            nodeApplicationService.register(execTime)
+                    .ifPresent(waitTime -> sleep(execTime, waitTime.millis()));
         }
-        nodeApplicationService.await(execTime);
-        nodeApplicationService.updateRank(execTime);
+        nodeApplicationService.rank(execTime)
+                .ifPresent(waitTime -> sleep(execTime, waitTime.millis()));;
         userApplicationService.update(execTime);
         logger.info("Node={} Time={} | Ending table updates.", nodeIdHolder.value(), execTime);
 
@@ -55,5 +56,15 @@ public class UserUpdateScheduler {
         userApplicationService.delete();
         nodeApplicationService.cleanup(execTime);
         logger.info("Node={} Time={} | Ending table purges.", nodeIdHolder.value(), execTime);
+    }
+
+    private void sleep(long execTime, long millis) {
+        try {
+            logger.info("Node={} Time={} | Sleep {}-millis.", nodeIdHolder.value(), execTime, millis);
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            logger.warn(e.getMessage());
+            Thread.currentThread().interrupt();
+        }
     }
 }

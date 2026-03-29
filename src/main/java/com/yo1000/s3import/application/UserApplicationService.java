@@ -127,7 +127,7 @@ public class UserApplicationService {
         Iterable<Long> creationEpochMillis = userRepository.findAllCreationEpochMillis();
         if (StreamSupport.stream(creationEpochMillis.spliterator(), false).count() > nodeProps.getGenerations()) {
             List<Long> keepGenerations = StreamSupport.stream(creationEpochMillis.spliterator(), false)
-                    .sorted((o1, o2) -> (int) (o2 - o1))
+                    .sorted((o1, o2) -> Long.compare(o2, o1))
                     .limit(nodeProps.getGenerations())
                     .toList();
 
