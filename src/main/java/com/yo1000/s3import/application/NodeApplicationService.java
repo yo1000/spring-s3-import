@@ -36,7 +36,7 @@ public class NodeApplicationService {
         return nodeRepository.findById(nodeIdHolder.value()).isPresent();
     }
 
-    public Optional<WaitTime> register(long execTime) {
+    public Optional<WaitTime> init() {
         Optional<WaitTime> waitTime = Optional.empty();
 
         if (nodeRepository.findById(Node.INIT_CHECK.id()).isPresent()) {
@@ -50,9 +50,11 @@ public class NodeApplicationService {
             }
         }
 
-        nodeRepository.save(new Node(nodeIdHolder.value(), -1, execTime));
-
         return waitTime;
+    }
+
+    public void register(long execTime) {
+        nodeRepository.save(new Node(nodeIdHolder.value(), -1, execTime));
     }
 
     public Optional<WaitTime> rank(long execTime) {
