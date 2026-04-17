@@ -9,7 +9,10 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.localstack.LocalStackContainer;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -31,8 +34,12 @@ class S3ImportApplicationTests {
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
-        registry.add("app.s3.endpoint", () -> localStack.getEndpoint());
+        System.setProperty("aws.region", localStack.getRegion());
+        System.setProperty("aws.accessKeyId", localStack.getAccessKey());
+        System.setProperty("aws.secretAccessKey", localStack.getSecretKey());
+
         registry.add("app.s3.path-style", () -> S3_PATH_STYLE);
+        registry.add("app.s3.endpoint", () -> localStack.getEndpoint());
         registry.add("app.s3.bucket-name", () -> S3_BUCKET_NAME);
         registry.add("app.csv.file-path", () -> S3_FILE_PATH);
     }
@@ -42,6 +49,10 @@ class S3ImportApplicationTests {
         try (S3Client s3Client = S3Client.builder()
                 .forcePathStyle(S3_PATH_STYLE)
                 .endpointOverride(localStack.getEndpoint())
+                .region(Region.of(localStack.getRegion()))
+                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(
+                        localStack.getAccessKey(),
+                        localStack.getSecretKey())))
                 .build()) {
             s3Client.createBucket(CreateBucketRequest.builder()
                     .bucket(S3_BUCKET_NAME)
